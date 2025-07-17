@@ -7,10 +7,10 @@ class UserPut(BaseModel):
     first_name: str
     last_name: str
 
-# class BalancePut(BaseModel):
-#     total: float
+class BalancePut(BaseModel):
+    total: float
 
-class ActionPut(BaseModel):
+class TransactionPut(BaseModel):
     type: Literal["withdraw", "deposit"] = "deposit"
     amount: float
 
@@ -44,7 +44,7 @@ class UserPatch(BaseModel):
 # class BalancePatch(BaseModel):
 #     total: Optional[float] = None
 
-class ActionPatch(BaseModel):
+class TransactionPatch(BaseModel):
     type: Optional[Literal["withdraw", "deposit"]] = None
     amount: Optional[float] = None
 

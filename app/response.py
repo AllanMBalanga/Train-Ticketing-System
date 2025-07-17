@@ -1,5 +1,5 @@
 from bson import ObjectId
-from typing import Annotated, Any, Callable, Literal
+from typing import Annotated, Any, Callable, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from pydantic_core import core_schema
 from datetime import datetime
@@ -39,6 +39,7 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 class BalanceResponse(BaseModel):
@@ -49,7 +50,7 @@ class BalanceResponse(BaseModel):
     balance_id: int
     total: float
     created_at: datetime
-
+    updated_at: Optional[datetime] = None
 
 #USERS POST
 class UserBalanceResponse(BaseModel):
@@ -67,7 +68,7 @@ class TransactionResponse(BaseModel):
     type: Literal["withdraw", "deposit"]
     amount: float
     created_at: datetime
-
+    updated_at: Optional[datetime] = None
 
 #TRANSACTIONS POST
 class TransactionBalanceResponse(BaseModel):

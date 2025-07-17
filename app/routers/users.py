@@ -38,6 +38,7 @@ def create_user(user: User):
 
         created_user = users.find_one({"_id": result.inserted_id})
 
+        #Creates balances upon creation of account
         balance_id = get_next_sequence("balance_id")
         balance_doc = {
             "user_id": user_id, 
@@ -57,8 +58,8 @@ def create_user(user: User):
             "balance":created_balance
         }
     
-    except HTTPException as http_error:
-        raise http_error
+    except HTTPException:
+        raise 
     
     except errors.DuplicateKeyError:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already in use")
@@ -78,16 +79,19 @@ def get_one_user(user_id: int):
 def put_user(user_id: int, user: UserPut):
     try:
         user.password = hash(user.password)
-        existing_user = users.find_one()
+        existing_user = users.find_one({"user_id": user_id})
         validate_user_exists(existing_user, user_id)
 
-        users.update_one({"user_id": user_id}, {"$set": user.dict()})
+        put_data = user.dict()
+        put_data["updated_at"] = datetime.utcnow()
+
+        users.update_one({"user_id": user_id}, {"$set": put_data})
         updated_user = users.find_one({"user_id": user_id})
 
         return updated_user
 
     except HTTPException:
-        raise HTTPException
+        raise 
 
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
@@ -99,29 +103,39 @@ def put_user(user_id: int, user: UserPatch):
         if user.password:
             user.password = hash(user.password)
             
-        existing_user = users.find_one()
+        existing_user = users.find_one({"user_id": user_id})
         validate_user_exists(existing_user, user_id)
 
-        users.update_one({"user_id": user_id}, {"$set": user.dict(exclude_unset=True)})
+        patch_data = user.dict(exclude_unset=True)
+        patch_data["updated_at"] = datetime.utcnow()
+
+        users.update_one({"user_id": user_id}, {"$set": patch_data})
         updated_user = users.find_one({"user_id": user_id})
 
         return updated_user
 
     except HTTPException:
-        raise HTTPException
+        raise 
     
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete(user_id: int):
+def hard_delete_user(user_id: int):
     try:
         user = users.find_one({"user_id": user_id})
         validate_user_exists(user, user_id)
-        users.delete_one(user)
+
+        users.delete_one({"user_id": user_id})
+        balances.delete_one({"user_id": user_id})
+        transactions.delete_many({"user_id": user_id})
+
         return
     
     except HTTPException:
+        raise 
+
+    except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
     
 @router.delete("/{user_id}/delete", status_code=status.HTTP_200_OK)
@@ -138,7 +152,7 @@ def soft_delete_user(user_id: int):
         return {"Detail": "User and related records softly deleted"}
     
     except HTTPException:
-        raise HTTPException
+        raise 
     
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
