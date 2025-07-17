@@ -1,7 +1,8 @@
 from pydantic import BaseModel, EmailStr
 from typing import Literal
-from .routers.users import db
+from .database import db
 from pymongo import ReturnDocument
+from datetime import datetime
 
 #FOR CREATING AUTO INCREMENTED IDs
 def get_next_sequence(name: str):
@@ -21,12 +22,22 @@ class User(BaseModel):
     first_name: str
     last_name: str
 
+class UserCreate(User):
+    user_id: int
+    created_at: datetime
+    is_deleted: bool = False
+
+
 #users/{user_id}/balances - Get only
 class Balance(BaseModel):
-    total: float
+    total: float    
+    user_id: int
+    balance_id: int
+    created_at: datetime
+    is_deleted: bool = False
 
 #users/{user_id}/balances/{balance_id}/actions
-class Action(BaseModel):
+class Transaction(BaseModel):
     type: Literal["withdraw", "deposit"] = "deposit"
     amount: float
 

@@ -1,7 +1,8 @@
 from bson import ObjectId
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any, Callable, Literal
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from pydantic_core import core_schema
+from datetime import datetime
 
 class _ObjectIdPydanticAnnotation:
     # Based on https://docs.pydantic.dev/latest/usage/types/custom/#handling-third-party-types.
@@ -28,6 +29,7 @@ PydanticObjectId = Annotated[
     ObjectId, _ObjectIdPydanticAnnotation
 ]
 
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -36,3 +38,72 @@ class UserResponse(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
+    created_at: datetime
+
+
+class BalanceResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: PydanticObjectId = Field(alias="_id")
+    user_id: int
+    balance_id: int
+    total: float
+    created_at: datetime
+
+
+#USERS POST
+class UserBalanceResponse(BaseModel):
+    user: UserResponse
+    balance: BalanceResponse
+
+
+class TransactionResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: PydanticObjectId = Field(alias="_id")
+    user_id: int
+    balance_id: int
+    transaction_id: int
+    type: Literal["withdraw", "deposit"]
+    amount: float
+    created_at: datetime
+
+
+#TRANSACTIONS POST
+class TransactionBalanceResponse(BaseModel):
+    transaction: TransactionResponse
+    balance: BalanceResponse
+
+
+class TransitResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: PydanticObjectId = Field(alias="_id")
+    name: str
+
+
+class StationResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: PydanticObjectId = Field(alias="_id")
+    transit_id: int
+    name: str
+    position: int
+
+
+class TravelResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: PydanticObjectId = Field(alias="_id")
+    departure_id: int
+    arrival_id: int
+    total: float
+
+
+class PaymentResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: PydanticObjectId = Field(alias="_id")
+    user_id: int
+    travel_id: int
+
