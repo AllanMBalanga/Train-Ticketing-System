@@ -14,22 +14,16 @@ class TransactionPut(BaseModel):
     type: Literal["withdraw", "deposit"] = "deposit"
     amount: float
 
-class TransitPut(BaseModel):
+class TrainPut(BaseModel):
     name: str
 
 class StationPut(BaseModel):
     name: str
     position: int
 
-class StationPatch(BaseModel):
-    name: Optional[str] = None
-    position: Optional[int] = None
-
-
 class TravelPut(BaseModel):
     departure_id: int
     arrival_id: int
-    total: float
 
 class PaymentPut(BaseModel):
     travel_id: int
@@ -48,13 +42,18 @@ class TransactionPatch(BaseModel):
     type: Optional[Literal["withdraw", "deposit"]] = None
     amount: Optional[float] = None
 
-class TransitPatch(BaseModel):
-    name: Optional[str] = None
+# class TrainPatch(BaseModel):
+#     name: Optional[str] = None
 
-class TravelPut(BaseModel):
+class StationPatch(BaseModel):
+    name: Optional[str] = None
+    position: Optional[int] = None
+
+class TravelPatch(BaseModel):
     departure_id: Optional[int] = None
     arrival_id: Optional[int] = None
-    total: Optional[float] = None
 
-class PaymentPatch(BaseModel):
-    travel_id: Optional[int] = None
+# class PaymentPatch(BaseModel):
+#     travel_id: Optional[int] = None
+
+

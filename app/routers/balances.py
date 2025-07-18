@@ -1,9 +1,9 @@
-from ..database import balances, users
 from fastapi import APIRouter, HTTPException, status
-from ..response import BalanceResponse
+from ..response import BalanceResponse, BalanceAdminResponse
 from ..updates import BalancePut
-from ..status_codes import validate_user_exists
+from ..status_codes import validate_user_exists, validate_balance_exists
 from datetime import datetime
+from ..queries import balances_find_one, balances, users_find_one
 
 router = APIRouter(
     prefix="/users/{user_id}/balances",
@@ -12,17 +12,17 @@ router = APIRouter(
 
 @router.get("/", response_model=BalanceResponse)
 def get_balance(user_id: int):
-    user = users.find_one({"user_id": user_id})
+    user = users_find_one(user_id)
     validate_user_exists(user, user_id)
 
-    balance = balances.find_one({"user_id": user_id})
+    balance = balances_find_one(user_id)
 
     return balance
 
-@router.put("/", response_model=BalanceResponse)
+@router.put("/", response_model=BalanceAdminResponse)
 def put_balance(user_id: int, balance: BalancePut):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
         put_data = balance.dict()
@@ -42,7 +42,7 @@ def put_balance(user_id: int, balance: BalancePut):
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 def hard_delete_balance(user_id: int):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
         balances.delete_one({"user_id": user_id})
@@ -58,7 +58,7 @@ def hard_delete_balance(user_id: int):
 @router.delete("/delete", status_code=status.HTTP_200_OK)
 def soft_delete_balance(user_id: int):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
         balances.update_one({"user_id": user_id}, {"$set": {"is_deleted": True}})

@@ -41,21 +41,20 @@ class Transaction(BaseModel):
     type: Literal["withdraw", "deposit"] = "deposit"
     amount: float
 
-#transits
-class Transit(BaseModel):
+#trains
+class Train(BaseModel):
     name: str
 
-#transits/{transit_id}/stations
+#trains/{train_id}/stations
 class Station(BaseModel):
     name: str
     position: int
 
-#travels
+#trains/{train_id}/travels
 class Travel(BaseModel):
-    departure_id: str
-    arrival_id: str
-    total: float
+    departure_id: int
+    arrival_id: int
 
 #users/{user_id}/payments
 class Payment(BaseModel):
-    travel_id: str
+    travel_id: int

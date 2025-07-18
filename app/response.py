@@ -29,7 +29,7 @@ PydanticObjectId = Annotated[
     ObjectId, _ObjectIdPydanticAnnotation
 ]
 
-
+#USER RESPONSES
 class UserResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -38,9 +38,6 @@ class UserResponse(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
 
 class BalanceResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -49,8 +46,6 @@ class BalanceResponse(BaseModel):
     user_id: int
     balance_id: int
     total: float
-    created_at: datetime
-    updated_at: Optional[datetime] = None
 
 #USERS POST
 class UserBalanceResponse(BaseModel):
@@ -67,44 +62,88 @@ class TransactionResponse(BaseModel):
     transaction_id: int
     type: Literal["withdraw", "deposit"]
     amount: float
-    created_at: datetime
-    updated_at: Optional[datetime] = None
 
 #TRANSACTIONS POST
 class TransactionBalanceResponse(BaseModel):
     transaction: TransactionResponse
     balance: BalanceResponse
 
-
-class TransitResponse(BaseModel):
+class TrainUserResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
+    train_id: int
     name: str
 
-
-class StationResponse(BaseModel):
+class StationUserResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
-    transit_id: int
+    train_id: int
+    station_id: int
     name: str
     position: int
 
-
-class TravelResponse(BaseModel):
+class TravelUserResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
+    train_id: int
+    travel_id: int
     departure_id: int
     arrival_id: int
     total: float
 
-
-class PaymentResponse(BaseModel):
+class PaymentUserResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
+    payment_id: int
     user_id: int
     travel_id: int
 
+class PaymentBalanceReponse(BaseModel):
+    payment: PaymentUserResponse
+    balance: BalanceResponse
+
+
+#ADMIN RESPONSES
+class UserAdminResponse(UserResponse):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_deleted: bool
+
+class BalanceAdminResponse(BalanceResponse):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_deleted: bool
+
+class TransactionAdminResponse(TransactionResponse):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_deleted: bool
+
+class TransactionBalanceAdminResponse(BaseModel):
+    transaction: TransactionAdminResponse
+    balance: BalanceAdminResponse
+
+class TrainAdminResponse(TrainUserResponse):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_deleted: bool
+
+class StationAdminResponse(StationUserResponse):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_deleted: bool
+
+
+class TravelAdminResponse(TravelUserResponse):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_deleted: bool
+
+class PaymentAdminResponse(PaymentUserResponse):
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_deleted: bool
