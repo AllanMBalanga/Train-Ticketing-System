@@ -2,7 +2,7 @@ from ..response import TransactionResponse, TransactionBalanceResponse, Transact
 from ..body import Transaction, get_next_sequence
 from fastapi import APIRouter, status, HTTPException
 from ..status_codes import validate_balance_exists, validate_user_exists, validate_transaction_exists
-from ..database import transactions, users, balances
+from ..queries import transactions, balances_update_one, transactions_delete_one, transactions_update_one, transactions_find, users_find_one, balances_find_one, transactions_find_one
 from datetime import datetime
 from typing import List
 from ..updates import TransactionPatch, TransactionPut
@@ -12,25 +12,27 @@ router = APIRouter(
     tags=["Transactions"]
 )
 
+transactions.create_index("transaction_id", unique=True)
+
 @router.get("/", response_model=List[TransactionResponse])
 def get_transactions(user_id: int, balance_id: int):
-    user = users.find_one({"user_id": user_id})
+    user = users_find_one(user_id)
     validate_user_exists(user, user_id)
 
-    balance = balances.find_one({"user_id": user_id,"balance_id": balance_id})
+    balance = balances_find_one(user_id, balance_id)
     validate_balance_exists(balance, balance_id)
 
-    existing_transactions = transactions.find({"user_id": user_id, "balance_id": balance_id})
+    existing_transactions = transactions_find(user_id, balance_id)
     
     return existing_transactions
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=TransactionBalanceResponse)
 def create_transaction(user_id: int, balance_id: int, transaction: Transaction):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
-        balance = balances.find_one({"user_id": user_id, "balance_id": balance_id})
+        balance = balances_find_one(user_id, balance_id)
         validate_balance_exists(balance, balance_id)
 
         transaction_id = get_next_sequence("transaction_id")
@@ -56,9 +58,9 @@ def create_transaction(user_id: int, balance_id: int, transaction: Transaction):
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Total balance not sufficient")
             else:
                 new_balance = total_balance - transaction.amount
-        
-        balances.update_one({"user_id": user_id, "balance_id": balance_id}, {"$set": {"total": new_balance}})
-        updated_balance = balances.find_one({"user_id": user_id, "balance_id": balance_id})
+                
+        balances_update_one(user_id=user_id, balance_id=balance_id, data={"total": new_balance})
+        updated_balance = balances_find_one(user_id, balance_id)
         
         return {
             "transaction": created_transaction,
@@ -74,13 +76,13 @@ def create_transaction(user_id: int, balance_id: int, transaction: Transaction):
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
 def get_transactions(user_id: int, balance_id: int, transaction_id: int):
-    user = users.find_one({"user_id": user_id})
+    user = users_find_one(user_id)
     validate_user_exists(user, user_id)
 
-    balance = balances.find_one({"user_id": user_id,"balance_id": balance_id})
+    balance = balances_find_one(user_id, balance_id)
     validate_balance_exists(balance, balance_id)
 
-    existing_transaction = transactions.find_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+    existing_transaction = transactions_find_one(user_id, balance_id, transaction_id)
     validate_transaction_exists(existing_transaction, transaction_id)
 
     return existing_transaction
@@ -89,13 +91,13 @@ def get_transactions(user_id: int, balance_id: int, transaction_id: int):
 @router.put("/{transaction_id}", response_model=TransactionBalanceAdminResponse)
 def put_transaction(user_id: int, balance_id: int, transaction_id: int, transaction: TransactionPut):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
-        balance = balances.find_one({"user_id": user_id,"balance_id": balance_id})
+        balance = balances_find_one(user_id, balance_id)
         validate_balance_exists(balance, balance_id)
 
-        existing_transaction = transactions.find_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+        existing_transaction = transactions_find_one(user_id, balance_id, transaction_id)
         validate_transaction_exists(existing_transaction, transaction_id)
 
         #reset balance before the transaction
@@ -114,17 +116,11 @@ def put_transaction(user_id: int, balance_id: int, transaction_id: int, transact
         put_data = transaction.dict()
         put_data["updated_at"] = datetime.utcnow()
 
-        transactions.update_one(
-            {"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id},
-            {"$set": put_data}
-        )
-        updated_transaction = transactions.find_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+        transactions_update_one(user_id, balance_id, transaction_id, put_data)
+        updated_transaction = transactions_find_one(user_id, balance_id, transaction_id)
 
-        balances.update_one(
-            {"user_id": user_id, "balance_id": balance_id},
-            {"$set": {"total": balance["total"], "updated_at": datetime.utcnow()}}
-        )
-        updated_balance = balances.find_one({"user_id": user_id, "balance_id": balance_id})
+        balances_update_one(user_id=user_id, balance_id=balance_id, data={"total": balance["total"], "updated_at": datetime.utcnow()})
+        updated_balance = balances_find_one(user_id, balance_id)
 
         return {
             "transaction": updated_transaction,
@@ -141,13 +137,13 @@ def put_transaction(user_id: int, balance_id: int, transaction_id: int, transact
 @router.patch("/{transaction_id}", response_model=TransactionBalanceAdminResponse)
 def put_transaction(user_id: int, balance_id: int, transaction_id: int, transaction: TransactionPatch):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
-        balance = balances.find_one({"user_id": user_id,"balance_id": balance_id})
+        balance = balances_find_one(user_id, balance_id)
         validate_balance_exists(balance, balance_id)
 
-        existing_transaction = transactions.find_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+        existing_transaction = transactions_find_one(user_id, balance_id, transaction_id)
         validate_transaction_exists(existing_transaction, transaction_id)
 
         patch_data = transaction.dict(exclude_unset=True)
@@ -170,17 +166,11 @@ def put_transaction(user_id: int, balance_id: int, transaction_id: int, transact
         else:
             balance["total"] += new_amount
 
-        transactions.update_one(
-            {"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id},
-            {"$set": patch_data}
-        )
-        updated_transaction = transactions.find_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+        transactions_update_one(user_id, balance_id, transaction_id, patch_data)
+        updated_transaction = transactions_find_one(user_id, balance_id, transaction_id)
 
-        balances.update_one(
-            {"user_id": user_id, "balance_id": balance_id},
-            {"$set": {"total": balance["total"], "updated_at": datetime.utcnow()}}
-        )
-        updated_balance = balances.find_one({"user_id": user_id, "balance_id": balance_id})
+        balances_update_one(user_id=user_id, balance_id=balance_id, data={"total": balance["total"], "updated_at": datetime.utcnow()})
+        updated_balance = balances_find_one(user_id, balance_id)
 
         return {
             "transaction": updated_transaction,
@@ -197,16 +187,16 @@ def put_transaction(user_id: int, balance_id: int, transaction_id: int, transact
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 def hard_delete_transaction(user_id: int, balance_id: int, transaction_id: int):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
-        balance = balances.find_one({"user_id": user_id,"balance_id": balance_id})
+        balance = balances_find_one(user_id, balance_id)
         validate_balance_exists(balance, balance_id)
 
-        existing_transaction = transactions.find_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+        existing_transaction = transactions_find_one(user_id, balance_id, transaction_id)
         validate_transaction_exists(existing_transaction, transaction_id)
 
-        transactions.delete_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+        transactions_delete_one(user_id, balance_id, transaction_id)
 
         return 
 
@@ -219,16 +209,16 @@ def hard_delete_transaction(user_id: int, balance_id: int, transaction_id: int):
 @router.delete("/{transaction_id}/delete", status_code=status.HTTP_200_OK)
 def soft_delete_transaction(user_id: int, balance_id: int, transaction_id: int):
     try:
-        user = users.find_one({"user_id": user_id})
+        user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
-        balance = balances.find_one({"user_id": user_id,"balance_id": balance_id})
+        balance = balances_find_one(user_id, balance_id)
         validate_balance_exists(balance, balance_id)
 
-        existing_transaction = transactions.find({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id})
+        existing_transaction = transactions_find_one(user_id, balance_id, transaction_id)
         validate_transaction_exists(existing_transaction, transaction_id)
 
-        transactions.update_one({"user_id": user_id, "balance_id": balance_id, "transaction_id": transaction_id}, {"$set": {"is_deleted": True}})
+        transactions_update_one(user_id, balance_id, transaction_id, {"is_deleted": True})
 
         return {"Detail": "User's transaction softly deleted"}
 

@@ -68,14 +68,14 @@ class TransactionBalanceResponse(BaseModel):
     transaction: TransactionResponse
     balance: BalanceResponse
 
-class TrainUserResponse(BaseModel):
+class TrainResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
     train_id: int
     name: str
 
-class StationUserResponse(BaseModel):
+class StationResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
@@ -84,7 +84,7 @@ class StationUserResponse(BaseModel):
     name: str
     position: int
 
-class TravelUserResponse(BaseModel):
+class TravelResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
@@ -94,7 +94,7 @@ class TravelUserResponse(BaseModel):
     arrival_id: int
     total: float
 
-class PaymentUserResponse(BaseModel):
+class PaymentResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
@@ -103,7 +103,7 @@ class PaymentUserResponse(BaseModel):
     travel_id: int
 
 class PaymentBalanceReponse(BaseModel):
-    payment: PaymentUserResponse
+    payment: PaymentResponse
     balance: BalanceResponse
 
 
@@ -127,23 +127,22 @@ class TransactionBalanceAdminResponse(BaseModel):
     transaction: TransactionAdminResponse
     balance: BalanceAdminResponse
 
-class TrainAdminResponse(TrainUserResponse):
+class TrainAdminResponse(TrainResponse):
     created_at: datetime
     updated_at: Optional[datetime] = None
     is_deleted: bool
 
-class StationAdminResponse(StationUserResponse):
+class StationAdminResponse(StationResponse):
     created_at: datetime
     updated_at: Optional[datetime] = None
     is_deleted: bool
 
-
-class TravelAdminResponse(TravelUserResponse):
+class TravelAdminResponse(TravelResponse):
     created_at: datetime
     updated_at: Optional[datetime] = None
     is_deleted: bool
 
-class PaymentAdminResponse(PaymentUserResponse):
+class PaymentAdminResponse(PaymentResponse):
     created_at: datetime
     updated_at: Optional[datetime] = None
     is_deleted: bool

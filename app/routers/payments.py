@@ -1,8 +1,8 @@
 from fastapi import APIRouter, status, HTTPException
-from ..queries import payments_find_one, payments, travels_find_by_id, users_find_one, balances, travels, balances_find_one
+from ..queries import payments_delete_one, payments_update_one, payments_find, payments_find_one, payments, travels_find_by_id, users_find_one, balances, balances_find_one, balances_update_one
 from ..body import get_next_sequence, Payment
 from ..updates import PaymentPut
-from ..response import PaymentUserResponse, PaymentAdminResponse, PaymentBalanceReponse
+from ..response import PaymentResponse, PaymentAdminResponse, PaymentBalanceReponse
 from ..status_codes import validate_payment_exists, validate_user_exists, validate_balance_exists, validate_travel_exists
 from typing import List
 from datetime import datetime
@@ -12,9 +12,11 @@ router = APIRouter(
     tags=["Payments"]
 )
 
-@router.get("/", response_model=List[PaymentUserResponse])
+payments.create_index("payment_id", unique=True)
+
+@router.get("/", response_model=List[PaymentResponse])
 def get_payments(user_id: int):
-    existing_payments = payments.find({"user_id": user_id})
+    existing_payments = payments_find(user_id)
     
     return existing_payments
 
@@ -38,8 +40,9 @@ def create_payment(user_id: int, payment: Payment):
         else:
             new_balance = user_balance_total - travel_total
 
-        balances.update_one({"user_id": user_id}, {"$set": {"total": new_balance}})
-        updated_balance = balances.find_one({"user_id": user_id})
+        balances_update_one(user_id, {"total": new_balance})
+
+        updated_balance = balances_find_one(user_id)
 
         payment_id = get_next_sequence("payment_id")
         payment_data = {
@@ -65,7 +68,7 @@ def create_payment(user_id: int, payment: Payment):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
     
-@router.get("/{payment_id}", response_model=PaymentUserResponse)
+@router.get("/{payment_id}", response_model=PaymentResponse)
 def get_payment(user_id: int, payment_id: int):
     user = users_find_one(user_id)
     validate_user_exists(user, user_id)
@@ -89,8 +92,7 @@ def put_payment(user_id: int, payment_id: int, payment: PaymentPut):
 
         # Revert previous travel total to balance (refund)
         previous_travel = travels_find_by_id(existing_payment["travel_id"])
-        print(previous_travel)
-        print(existing_payment["travel_id"])
+
         validate_travel_exists(previous_travel, existing_payment["travel_id"])
 
         reverted_balance_total = existing_balance["total"] + previous_travel["total"]
@@ -105,16 +107,17 @@ def put_payment(user_id: int, payment_id: int, payment: PaymentPut):
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Total balance not sufficient for updated travel")
 
         updated_balance_total = reverted_balance_total - new_travel_total
-        balances.update_one({"user_id": user_id}, {"$set": {"total": updated_balance_total}})
-        updated_balance = balances.find_one({"user_id": user_id})
+        
+        balances_update_one(user_id, {"total": updated_balance_total})
+        updated_balance = balances_find_one(user_id)
 
         updated_data = {
             "travel_id": payment.travel_id,
             "updated_at": datetime.utcnow()
         }
 
-        payments.update_one({"user_id": user_id, "payment_id": payment_id}, {"$set": updated_data})
-        updated_payment = payments.find_one({"user_id": user_id, "payment_id": payment_id})
+        payments_update_one(user_id, payment_id, updated_data)
+        updated_payment = payments_find_one(user_id, payment_id)
 
         return {
             "payment": updated_payment,
@@ -136,7 +139,7 @@ def hard_delete_payment(user_id: int, payment_id: int):
         existing_payment = payments_find_one(user_id, payment_id)
         validate_payment_exists(existing_payment, payment_id)
 
-        payments.delete_one({"user_id": user_id, "payment_id": payment_id})
+        payments_delete_one(user_id, payment_id)
 
         return
 
@@ -155,7 +158,7 @@ def soft_delete_payment(user_id: int, payment_id: int):
         existing_payment = payments_find_one(user_id, payment_id)
         validate_payment_exists(existing_payment, payment_id)
 
-        payments.update_one({"user_id": int, "payment_id": payment_id}, {"$set": {"is_deleted": True}})
+        payments_update_one(user_id, payment_id, {"is_deleted": True})
 
         return {"Detail": f"Payment with id {payment_id} softly deleted"}
 

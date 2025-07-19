@@ -1,8 +1,8 @@
 from fastapi import APIRouter, status, HTTPException
 from ..body import Travel, get_next_sequence
 from ..updates import TravelPut, TravelPatch
-from ..response import TravelAdminResponse, TravelUserResponse
-from ..queries import travels_find_one, travels, stations, trains, trains_find_one, stations_find_one
+from ..response import TravelAdminResponse, TravelResponse
+from ..queries import travels_find_one, travels, stations, trains_find_one, stations_find_one, travels_delete_one, travels_update_one, travels_find
 from ..status_codes import validate_travel_exists, validate_station_exists, validate_train_exists
 from typing import List
 from datetime import datetime
@@ -15,17 +15,18 @@ router = APIRouter(
 BASE_FARE = 13
 PER_STATION_RATE = 1.3
 
+travels.create_index("travel_id", unique=True)
 
-@router.get("/", response_model=List[TravelUserResponse])
+@router.get("/", response_model=List[TravelResponse])
 def get_travels(train_id: int):
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
-
-    travel = travels.find({"train_id": train_id})
+    
+    travel = travels_find(train_id)
 
     return travel
 
-@router.post("/", response_model=TravelUserResponse)
+@router.post("/", response_model=TravelResponse)
 def create_travels(train_id: int, travel: Travel):
     try:
         existing_train = trains_find_one(train_id)
@@ -60,10 +61,10 @@ def create_travels(train_id: int, travel: Travel):
     except HTTPException:
         raise
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
-@router.get("/{travel_id}", response_model=TravelUserResponse)
+@router.get("/{travel_id}", response_model=TravelResponse)
 def get_travel(train_id: int, travel_id: int):
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
@@ -73,7 +74,7 @@ def get_travel(train_id: int, travel_id: int):
 
     return existing_travel
 
-@router.put("/{travel_id}", response_model=TravelUserResponse)
+@router.put("/{travel_id}", response_model=TravelResponse)
 def put_travel(train_id: int, travel_id: int, travel: TravelPut):
     try:
         existing_train = trains_find_one(train_id)
@@ -96,7 +97,7 @@ def put_travel(train_id: int, travel_id: int, travel: TravelPut):
             "updated_at": datetime.utcnow(),
         }
 
-        travels.update_one({"train_id": train_id, "travel_id": travel_id}, {"$set": travel_data})
+        travels_update_one(train_id, travel_id, travel_data)
         updated_travel = travels.find_one({"train_id": train_id, "travel_id": travel_id})
 
         return updated_travel
@@ -107,7 +108,7 @@ def put_travel(train_id: int, travel_id: int, travel: TravelPut):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
-@router.patch("/{travel_id}", response_model=TravelUserResponse)
+@router.patch("/{travel_id}", response_model=TravelResponse)
 def patch_travel(train_id: int, travel_id: int, travel: TravelPatch):
     try:
         existing_train = trains_find_one(train_id)
@@ -122,9 +123,9 @@ def patch_travel(train_id: int, travel_id: int, travel: TravelPatch):
             #dict.get(key, default_value) - If key exists → return its value, If key doesn’t exist → return default_value instead
             dep_id = travel_updates.get("departure_id", existing_travel["departure_id"])
             arr_id = travel_updates.get("arrival_id", existing_travel["arrival_id"])
-
-            departure_station = stations.find_one({"train_id": train_id, "station_id": dep_id})
-            arrival_station = stations.find_one({"train_id": train_id, "station_id": arr_id})
+            
+            departure_station = stations_find_one(train_id, dep_id)
+            arrival_station = stations_find_one(train_id, arr_id)
             validate_station_exists(departure_station, dep_id)
             validate_station_exists(arrival_station, arr_id)
 
@@ -139,8 +140,8 @@ def patch_travel(train_id: int, travel_id: int, travel: TravelPatch):
             "updated_at": datetime.utcnow(),
         }
 
-        travels.update_one({"train_id": train_id, "travel_id": travel_id}, {"$set": travel_data})
-        updated_travel = travels.find_one({"train_id": train_id, "travel_id": travel_id})
+        travels_update_one(train_id, travel_id, travel_data)
+        updated_travel = travels_find_one(train_id, travel_id)
 
         return updated_travel
     
@@ -159,7 +160,7 @@ def hard_delete_travel(train_id: int, travel_id: int):
         existing_travel = travels_find_one(train_id, travel_id)
         validate_travel_exists(existing_travel, travel_id)
 
-        travels.delete_one({"train_id": train_id, "travel_id": travel_id})
+        travels_delete_one(train_id, travel_id)
 
         return
 
@@ -178,7 +179,7 @@ def soft_delete_travel(train_id: int, travel_id: int):
         existing_travel = travels_find_one(train_id, travel_id)
         validate_travel_exists(existing_travel, travel_id)
 
-        travels.update_one({"train_id": train_id, "travel_id": travel_id}, {"$set": {"is_deleted": True}})
+        travels_update_one(train_id, travel_id, {"is_deleted": True})
 
         return {"Detail": f"Travel with id {travel_id} softly deleted"}
 

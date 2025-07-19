@@ -22,19 +22,13 @@ class User(BaseModel):
     first_name: str
     last_name: str
 
-class UserCreate(User):
-    user_id: int
-    created_at: datetime
-    is_deleted: bool = False
-
-
 #users/{user_id}/balances - Get only
-class Balance(BaseModel):
-    total: float    
-    user_id: int
-    balance_id: int
-    created_at: datetime
-    is_deleted: bool = False
+# class Balance(BaseModel):
+#     total: float    
+#     user_id: int
+#     balance_id: int
+#     created_at: datetime
+#     is_deleted: bool = False
 
 #users/{user_id}/balances/{balance_id}/actions
 class Transaction(BaseModel):

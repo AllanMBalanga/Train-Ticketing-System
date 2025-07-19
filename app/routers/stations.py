@@ -1,8 +1,8 @@
 from fastapi import status, APIRouter, HTTPException
 from ..body import Station, get_next_sequence
 from ..updates import StationPatch, StationPut
-from ..response import StationAdminResponse, StationUserResponse
-from ..queries import stations_find_one, stations, trains_find_one
+from ..response import StationAdminResponse, StationResponse
+from ..queries import stations, stations_find_one, trains_find_one, stations_update_one, stations_delete_one
 from ..status_codes import validate_station_exists, validate_train_exists
 from typing import List
 from datetime import datetime
@@ -12,7 +12,9 @@ router = APIRouter(
     tags=["Stations"]
 )
 
-@router.get("/", response_model=List[StationUserResponse])
+stations.create_index("station_id", unique=True)
+
+@router.get("/", response_model=List[StationResponse])
 def get_stations(train_id: int):
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
@@ -48,7 +50,7 @@ def create_station(train_id: int, station: Station):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
-@router.get("/{station_id}", response_model=StationUserResponse)
+@router.get("/{station_id}", response_model=StationResponse)
 def get_station(train_id: int, station_id: int):
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
@@ -70,7 +72,7 @@ def put_station(train_id: int, station_id: int, station: StationPut):
         station_data = station.dict()
         station_data["updated_at"] = datetime.utcnow()
 
-        stations.update_one({"train_id": train_id, "station_id": station_id}, {"$set": station_data})
+        stations_update_one(train_id, station_id, station_data)
         updated_station = stations_find_one(train_id, station_id)
 
         return updated_station
@@ -94,7 +96,7 @@ def patch_station(train_id: int, station_id: int, station: StationPatch):
         station_data = station.dict(exclude_unset=True)
         station_data["updated_at"] = datetime.utcnow()
 
-        stations.update_one({"train_id": train_id, "station_id": station_id}, {"$set": station_data})
+        stations_update_one(train_id, station_id, station_data)
         updated_station = stations_find_one(train_id, station_id)
 
         return updated_station
@@ -114,7 +116,7 @@ def hard_delete_station(train_id: int, station_id: int):
         existing_station = stations_find_one(train_id, station_id)
         validate_station_exists(existing_station, station_id)
 
-        stations.delete_one({"train_id": train_id, "station_id": station_id})
+        stations_delete_one(train_id, station_id)
 
         return
     
@@ -133,7 +135,7 @@ def soft_delete_station(train_id: int, station_id: int):
         existing_station = stations_find_one(train_id, station_id)
         validate_station_exists(existing_station, station_id)
 
-        stations.update_one({"train_id": train_id, "station_id": station_id}, {"$set": {"is_deleted": True}})
+        stations_update_one(train_id, station_id, {"is_deleted": True})
 
         return {"Detail": f"Station with id {station_id} softly deleted"}
     

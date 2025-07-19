@@ -1,10 +1,10 @@
 from fastapi import APIRouter, status, HTTPException
 from ..body import Train, get_next_sequence
 from ..updates import TrainPut
-from ..response import TrainUserResponse, TrainAdminResponse
+from ..response import TrainResponse, TrainAdminResponse
 from typing import List
 from datetime import datetime
-from ..queries import trains_find_one, trains, stations, travels
+from ..queries import trains, trains_find_one, trains_update_one, trains_delete_one, stations_delete_many, stations_update_many, travels_delete_many, travels_update_many
 from ..status_codes import validate_train_exists
 
 router = APIRouter(
@@ -12,7 +12,9 @@ router = APIRouter(
     tags=["Trains"]
 )
 
-@router.get("/", response_model=List[TrainUserResponse])
+trains.create_index("train_id", unique=True)
+
+@router.get("/", response_model=List[TrainResponse])
 def get_trains():
     existing_trains = trains.find()
 
@@ -41,7 +43,7 @@ def create_trains(train: Train):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
-@router.get("/{train_id}", response_model=TrainUserResponse)
+@router.get("/{train_id}", response_model=TrainResponse)
 def get_train(train_id: int):
     train = trains_find_one(train_id)
     validate_train_exists(train, train_id)
@@ -57,8 +59,8 @@ def put_train(train_id: int, train: TrainPut):
         train_data = train.dict()
         train_data["updated_at"] = datetime.utcnow()
 
-        trains.update_one({"train_id": train_id}, {"$set": train_data})
-        updated_train = trains.find_one({"train_id": train_id})
+        trains_update_one(train_id, train_data)
+        updated_train = trains_find_one(train_id)
         
         return updated_train
     
@@ -74,9 +76,9 @@ def hard_delete_train(train_id: int):
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
-        trains.delete_one({"train_id": train_id})
-        stations.delete_many({"train_id": train_id})
-        travels.delete_many({"train_id": train_id})
+        trains_delete_one(train_id)
+        stations_delete_many(train_id)
+        travels_delete_many(train_id)
 
         return 
     
@@ -92,9 +94,9 @@ def soft_delete_train(train_id: int):
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
-        trains.update_one({"train_id": train_id}, {"$set": {"is_deleted": True}})
-        stations.update_many({"train_id": train_id}, {"$set": {"is_deleted": True}})
-        travels.update_many({"train_id": train_id}, {"$set": {"is_deleted": True}})
+        trains_update_one(train_id, {"is_deleted": True})
+        stations_update_many(train_id, {"is_deleted": True})
+        travels_update_many(train_id, {"is_deleted": True})
 
         return {"Detail": f"Train with id {train_id} and related records softly deleted"}
     
