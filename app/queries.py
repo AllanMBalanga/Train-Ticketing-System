@@ -16,6 +16,12 @@ def transactions_update_many(user_id: int, data: dict):
 def transactions_delete_many(user_id: int):
     return transactions.delete_many({"user_id": user_id})
 
+def payments_delete_many(user_id: int):
+    return payments.delete_many({"user_id": user_id})
+
+def payments_update_many(user_id: int, data: dict):
+    return payments.update_many({"user_id": user_id}, {"$set": data})
+
 
 #Balances.py
 def balances_find_one(user_id: int, balance_id: int = None):
@@ -72,6 +78,9 @@ def travels_delete_many(train_id: int):
 
 
 #Stations.py
+def stations_find(train_id: int):
+    return stations.find({"train_id": train_id})
+
 def stations_find_one(train_id: int, station_id: int):
     return stations.find_one({"train_id": train_id, "station_id": station_id, "is_deleted": False})
 

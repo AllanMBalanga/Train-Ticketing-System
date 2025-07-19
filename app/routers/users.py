@@ -7,7 +7,7 @@ from ..status_codes import validate_user_exists
 from ..response import UserBalanceResponse, UserResponse
 from ..body import User, get_next_sequence
 from ..utils import hash
-from ..queries import users, balances, balances_delete_one, balances_update_one, transactions_update_many, transactions_delete_many, users_find_one, users_delete_one, users_update_one
+from ..queries import users, balances, balances_delete_one, balances_update_one, transactions_update_many, transactions_delete_many, users_find_one, users_delete_one, users_update_one, payments_delete_many, payments_update_many
 
 router = APIRouter(
     prefix="/users",
@@ -136,6 +136,7 @@ def hard_delete_user(user_id: int):
         users_delete_one(user_id)
         balances_delete_one(user_id)
         transactions_delete_many(user_id)
+        payments_delete_many(user_id)
 
         return
     
@@ -156,6 +157,7 @@ def soft_delete_user(user_id: int):
         users_update_one(user_id, {"is_deleted": True})
         balances_update_one(user_id, {"is_deleted": True})
         transactions_update_many(user_id, {"is_deleted": True})
+        payments_update_many(user_id, {"is_deleted": True})
 
         return {"Detail": f"User with id {user_id} and related records softly deleted"}
     

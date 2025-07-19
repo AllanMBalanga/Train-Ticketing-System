@@ -2,7 +2,7 @@ from fastapi import status, APIRouter, HTTPException
 from ..body import Station, get_next_sequence
 from ..updates import StationPatch, StationPut
 from ..response import StationAdminResponse, StationResponse
-from ..queries import stations, stations_find_one, trains_find_one, stations_update_one, stations_delete_one
+from ..queries import stations, stations_find_one, trains_find_one, stations_update_one, stations_delete_one, stations_find
 from ..status_codes import validate_station_exists, validate_train_exists
 from typing import List
 from datetime import datetime
@@ -19,7 +19,7 @@ def get_stations(train_id: int):
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
 
-    existing_stations = stations.find()
+    existing_stations = stations_find(train_id)
 
     return existing_stations
 

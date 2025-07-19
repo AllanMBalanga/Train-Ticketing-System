@@ -98,9 +98,10 @@ class PaymentResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: PydanticObjectId = Field(alias="_id")
-    payment_id: int
     user_id: int
     travel_id: int
+    payment_id: int
+
 
 class PaymentBalanceReponse(BaseModel):
     payment: PaymentResponse
