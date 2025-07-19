@@ -1,7 +1,7 @@
 from pymongo import MongoClient
-
+from .config import settings
 #"mongodb://<username>:<password>@localhost:27017/"
-client = MongoClient("mongodb://admin:031802@localhost:27017/?authSource=admin")
+client = MongoClient(f"mongodb://{settings.database_user}:{settings.database_password}@{settings.database_host}:27017/?authSource=admin")
 
 #create an instance of database trains
 db = client.trains

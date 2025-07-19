@@ -83,3 +83,18 @@ def validate_payment_exists(payment, payment_id: int = None):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=detail
         )
+
+#Token and logged in IDs
+def validate_logged_in_user(current_user: int, user_id: int):
+    if current_user != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to perform this action"
+        )
+
+def validate_required_roles(current_user_role: str, allowed_roles: list[str]):
+    if current_user_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Only {', '.join(allowed_roles)} authorized to perform this action"
+        )

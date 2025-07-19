@@ -101,9 +101,10 @@ class PaymentResponse(BaseModel):
     user_id: int
     travel_id: int
     payment_id: int
+    amount: float
 
 
-class PaymentBalanceReponse(BaseModel):
+class PaymentBalanceResponse(BaseModel):
     payment: PaymentResponse
     balance: BalanceResponse
 
@@ -147,3 +148,7 @@ class PaymentAdminResponse(PaymentResponse):
     created_at: datetime
     updated_at: Optional[datetime] = None
     is_deleted: bool
+
+class PaymentBalanceAdminResponse(BaseModel):
+    payment: PaymentAdminResponse
+    balance: BalanceAdminResponse

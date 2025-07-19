@@ -1,11 +1,12 @@
-from ..response import TransactionResponse, TransactionBalanceResponse, TransactionBalanceAdminResponse
-from ..body import Transaction, get_next_sequence
-from fastapi import APIRouter, status, HTTPException
-from ..status_codes import validate_balance_exists, validate_user_exists, validate_transaction_exists
+from ..response import TransactionResponse, TransactionBalanceResponse, TransactionBalanceAdminResponse, TransactionAdminResponse
+from ..body import Transaction, get_next_sequence, TokenData
+from fastapi import APIRouter, status, HTTPException, Depends
+from ..status_codes import validate_logged_in_user, validate_required_roles, validate_balance_exists, validate_user_exists, validate_transaction_exists
 from ..queries import transactions, balances_update_one, transactions_delete_one, transactions_update_one, transactions_find, users_find_one, balances_find_one, transactions_find_one
 from datetime import datetime
-from typing import List
+from typing import List, Union
 from ..updates import TransactionPatch, TransactionPut
+from ..oauth2 import get_current_user
 
 router = APIRouter(
     prefix="/users/{user_id}/balances/{balance_id}/transactions",
@@ -14,8 +15,12 @@ router = APIRouter(
 
 transactions.create_index("transaction_id", unique=True)
 
-@router.get("/", response_model=List[TransactionResponse])
-def get_transactions(user_id: int, balance_id: int):
+@router.get("/", response_model=List[Union[TransactionResponse, TransactionAdminResponse]])
+def get_transactions(user_id: int, balance_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+    if current_user.role == "user":
+        validate_logged_in_user(current_user.id, user_id)
+
     user = users_find_one(user_id)
     validate_user_exists(user, user_id)
 
@@ -24,11 +29,17 @@ def get_transactions(user_id: int, balance_id: int):
 
     existing_transactions = transactions_find(user_id, balance_id)
     
-    return existing_transactions
+    if current_user.role == "user":
+        return [TransactionResponse(**t) for t in existing_transactions]
+    else:
+        return [TransactionAdminResponse(**t) for t in existing_transactions]
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=TransactionBalanceResponse)
-def create_transaction(user_id: int, balance_id: int, transaction: Transaction):
+def create_transaction(user_id: int, balance_id: int, transaction: Transaction, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["user"])
+        validate_logged_in_user(current_user.id, user_id)
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -74,8 +85,12 @@ def create_transaction(user_id: int, balance_id: int, transaction: Transaction):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 
-@router.get("/{transaction_id}", response_model=TransactionResponse)
-def get_transactions(user_id: int, balance_id: int, transaction_id: int):
+@router.get("/{transaction_id}", response_model=Union[TransactionResponse, TransactionAdminResponse])
+def get_transactions(user_id: int, balance_id: int, transaction_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+    if current_user.role == "user":
+        validate_logged_in_user(current_user.id, user_id)
+
     user = users_find_one(user_id)
     validate_user_exists(user, user_id)
 
@@ -85,12 +100,17 @@ def get_transactions(user_id: int, balance_id: int, transaction_id: int):
     existing_transaction = transactions_find_one(user_id, balance_id, transaction_id)
     validate_transaction_exists(existing_transaction, transaction_id)
 
-    return existing_transaction
+    if current_user.role == "user":
+        return TransactionResponse(**existing_transaction)
+    else:
+        return TransactionAdminResponse(**existing_transaction)
 
 
 @router.put("/{transaction_id}", response_model=TransactionBalanceAdminResponse)
-def put_transaction(user_id: int, balance_id: int, transaction_id: int, transaction: TransactionPut):
+def put_transaction(user_id: int, balance_id: int, transaction_id: int, transaction: TransactionPut, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -135,8 +155,10 @@ def put_transaction(user_id: int, balance_id: int, transaction_id: int, transact
 
 
 @router.patch("/{transaction_id}", response_model=TransactionBalanceAdminResponse)
-def put_transaction(user_id: int, balance_id: int, transaction_id: int, transaction: TransactionPatch):
+def put_transaction(user_id: int, balance_id: int, transaction_id: int, transaction: TransactionPatch, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -185,8 +207,10 @@ def put_transaction(user_id: int, balance_id: int, transaction_id: int, transact
 
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
-def hard_delete_transaction(user_id: int, balance_id: int, transaction_id: int):
+def hard_delete_transaction(user_id: int, balance_id: int, transaction_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -207,8 +231,12 @@ def hard_delete_transaction(user_id: int, balance_id: int, transaction_id: int):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/{transaction_id}/delete", status_code=status.HTTP_200_OK)
-def soft_delete_transaction(user_id: int, balance_id: int, transaction_id: int):
+def soft_delete_transaction(user_id: int, balance_id: int, transaction_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["user", "admin"])
+        if current_user.role == "user":
+            validate_logged_in_user(current_user.id, user_id)
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -220,7 +248,7 @@ def soft_delete_transaction(user_id: int, balance_id: int, transaction_id: int):
 
         transactions_update_one(user_id, balance_id, transaction_id, {"is_deleted": True})
 
-        return {"Detail": "User's transaction softly deleted"}
+        return {"detail": "User's transaction softly deleted"}
 
     except HTTPException:
         raise 

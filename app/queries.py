@@ -79,7 +79,7 @@ def travels_delete_many(train_id: int):
 
 #Stations.py
 def stations_find(train_id: int):
-    return stations.find({"train_id": train_id})
+    return stations.find({"train_id": train_id, "is_deleted": False})
 
 def stations_find_one(train_id: int, station_id: int):
     return stations.find_one({"train_id": train_id, "station_id": station_id, "is_deleted": False})
@@ -103,7 +103,6 @@ def travels_update_one(train_id: int, travel_id: int, data: dict):
 
 def travels_delete_one(train_id: int, travel_id: int):
     return travels.delete_one({"train_id": train_id, "travel_id": travel_id})
-
 
 
 #Payments.py

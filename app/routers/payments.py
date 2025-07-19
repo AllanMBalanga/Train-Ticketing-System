@@ -1,11 +1,12 @@
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, status, HTTPException, Depends
 from ..queries import payments_delete_one, payments_update_one, payments_find, payments_find_one, payments, travels_find_by_id, users_find_one, balances, balances_find_one, balances_update_one
-from ..body import get_next_sequence, Payment
+from ..body import get_next_sequence, Payment, TokenData
 from ..updates import PaymentPut
-from ..response import PaymentResponse, PaymentAdminResponse, PaymentBalanceReponse
-from ..status_codes import validate_payment_exists, validate_user_exists, validate_balance_exists, validate_travel_exists
-from typing import List
+from ..response import PaymentResponse, PaymentAdminResponse, PaymentBalanceResponse, PaymentBalanceAdminResponse 
+from ..status_codes import validate_logged_in_user, validate_required_roles, validate_payment_exists, validate_user_exists, validate_balance_exists, validate_travel_exists
+from typing import List, Union
 from datetime import datetime
+from ..oauth2 import get_current_user
 
 router = APIRouter(
     prefix="/users/{user_id}/payments",
@@ -14,15 +15,25 @@ router = APIRouter(
 
 payments.create_index("payment_id", unique=True)
 
-@router.get("/", response_model=List[PaymentResponse])
-def get_payments(user_id: int):
+@router.get("/", response_model=List[Union[PaymentResponse, PaymentAdminResponse]])
+def get_payments(user_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+    if current_user.role == "user":
+        validate_logged_in_user(current_user.id, user_id)
+
     existing_payments = payments_find(user_id)
     
-    return existing_payments
+    if current_user.role == "user":
+        return [PaymentResponse(**i) for i in existing_payments]
+    else:
+        return [PaymentAdminResponse(**i) for i in existing_payments]
 
-@router.post("/", response_model=PaymentBalanceReponse)
-def create_payment(user_id: int, payment: Payment):
+@router.post("/", response_model=PaymentBalanceResponse, status_code=status.HTTP_201_CREATED)
+def create_payment(user_id: int, payment: Payment, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["user"])
+        validate_logged_in_user(current_user.id, user_id)
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -49,6 +60,7 @@ def create_payment(user_id: int, payment: Payment):
             "user_id": user_id,
             "payment_id": payment_id,
             **payment.dict(),
+            "amount": travel_total,
             "created_at": datetime.utcnow(),
             "updated_at": None,
             "is_deleted": False
@@ -68,19 +80,28 @@ def create_payment(user_id: int, payment: Payment):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
     
-@router.get("/{payment_id}", response_model=PaymentResponse)
-def get_payment(user_id: int, payment_id: int):
+@router.get("/{payment_id}", response_model=Union[PaymentResponse, PaymentAdminResponse])
+def get_payment(user_id: int, payment_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+    if current_user.role == "user":
+        validate_logged_in_user(current_user.id, user_id)
+
     user = users_find_one(user_id)
     validate_user_exists(user, user_id)
 
     payment = payments_find_one(user_id, payment_id)
     validate_payment_exists(payment, payment_id)
 
-    return payment
+    if current_user.role == "user":
+        return PaymentResponse(**payment)
+    else:
+        return PaymentAdminResponse(**payment)
 
-@router.put("/{payment_id}", response_model=PaymentBalanceReponse)
-def put_payment(user_id: int, payment_id: int, payment: PaymentPut):
+@router.put("/{payment_id}", response_model=PaymentBalanceAdminResponse)
+def put_payment(user_id: int, payment_id: int, payment: PaymentPut, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -131,8 +152,10 @@ def put_payment(user_id: int, payment_id: int, payment: PaymentPut):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def hard_delete_payment(user_id: int, payment_id: int):
+def hard_delete_payment(user_id: int, payment_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+        
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -150,8 +173,12 @@ def hard_delete_payment(user_id: int, payment_id: int):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
     
 @router.delete("/{payment_id}/delete", status_code=status.HTTP_200_OK)
-def soft_delete_payment(user_id: int, payment_id: int):
+def soft_delete_payment(user_id: int, payment_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["user", "admin"])
+        if current_user.role == "user":
+            validate_logged_in_user(current_user.id, user_id)
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -160,7 +187,7 @@ def soft_delete_payment(user_id: int, payment_id: int):
 
         payments_update_one(user_id, payment_id, {"is_deleted": True})
 
-        return {"Detail": f"Payment with id {payment_id} softly deleted"}
+        return {"detail": f"Payment with id {payment_id} softly deleted"}
 
     except HTTPException:
         raise

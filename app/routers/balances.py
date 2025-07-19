@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from ..response import BalanceResponse, BalanceAdminResponse
 from ..updates import BalancePut
-from ..status_codes import validate_user_exists, validate_balance_exists
+from ..status_codes import validate_user_exists, validate_logged_in_user, validate_required_roles
 from datetime import datetime
 from ..queries import balances, balances_find_one, users_find_one, balances_delete_one, balances_update_one
+from typing import Union
+from ..oauth2 import get_current_user
+from ..body import TokenData
 
 router = APIRouter(
     prefix="/users/{user_id}/balances",
@@ -12,18 +15,28 @@ router = APIRouter(
 
 balances.create_index("balance_id", unique=True)
 
-@router.get("/", response_model=BalanceResponse)
-def get_balance(user_id: int):
+@router.get("/", response_model=Union[BalanceResponse, BalanceAdminResponse])
+def get_balance(user_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+    if current_user.role == "user":
+        validate_logged_in_user(current_user.id, user_id)
+
     user = users_find_one(user_id)
     validate_user_exists(user, user_id)
 
     balance = balances_find_one(user_id)
 
-    return balance
+    if current_user.role == "user":
+        return BalanceResponse(**balance)
+    else:
+        return BalanceAdminResponse(**balance)
+
 
 @router.put("/", response_model=BalanceAdminResponse)
-def put_balance(user_id: int, balance: BalancePut):
+def put_balance(user_id: int, balance: BalancePut, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+ 
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -42,8 +55,10 @@ def put_balance(user_id: int, balance: BalancePut):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
-def hard_delete_balance(user_id: int):
+def hard_delete_balance(user_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
@@ -58,14 +73,18 @@ def hard_delete_balance(user_id: int):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/delete", status_code=status.HTTP_200_OK)
-def soft_delete_balance(user_id: int):
+def soft_delete_balance(user_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["user", "admin"])
+        if current_user.role == "user":
+            validate_logged_in_user(current_user.id, user_id)
+
         user = users_find_one(user_id)
         validate_user_exists(user, user_id)
 
         balances_update_one(user_id, {"is_deleted": True})
         
-        return {"Detail": "User's balance softly deleted"}
+        return {"detail": "User's balance softly deleted"}
     
     except HTTPException:
         raise 

@@ -1,11 +1,12 @@
-from fastapi import status, APIRouter, HTTPException
-from ..body import Station, get_next_sequence
+from fastapi import status, APIRouter, HTTPException, Depends
+from ..body import Station, get_next_sequence, TokenData
 from ..updates import StationPatch, StationPut
 from ..response import StationAdminResponse, StationResponse
 from ..queries import stations, stations_find_one, trains_find_one, stations_update_one, stations_delete_one, stations_find
-from ..status_codes import validate_station_exists, validate_train_exists
-from typing import List
+from ..status_codes import validate_station_exists, validate_train_exists, validate_required_roles
+from typing import List, Union
 from datetime import datetime
+from ..oauth2 import get_current_user
 
 router = APIRouter(
     prefix="/trains/{train_id}/stations",
@@ -14,18 +15,25 @@ router = APIRouter(
 
 stations.create_index("station_id", unique=True)
 
-@router.get("/", response_model=List[StationResponse])
-def get_stations(train_id: int):
+@router.get("/", response_model=List[Union[StationResponse, StationAdminResponse]])
+def get_stations(train_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
 
     existing_stations = stations_find(train_id)
 
-    return existing_stations
+    if current_user.role == "user":
+        return [StationResponse(**i) for i in existing_stations]
+    else:
+        return [StationAdminResponse(**i) for i in existing_stations]
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=StationAdminResponse)
-def create_station(train_id: int, station: Station):
+def create_station(train_id: int, station: Station, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -50,19 +58,26 @@ def create_station(train_id: int, station: Station):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
-@router.get("/{station_id}", response_model=StationResponse)
-def get_station(train_id: int, station_id: int):
+@router.get("/{station_id}", response_model=Union[StationResponse, StationAdminResponse])
+def get_station(train_id: int, station_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
 
     existing_station = stations_find_one(train_id, station_id)
     validate_station_exists(existing_station, station_id)
 
-    return existing_station
+    if current_user.role == "user":
+        return StationResponse(**existing_station)
+    else:
+        return StationAdminResponse(**existing_station)
 
 @router.put("/{station_id}", response_model=StationAdminResponse)
-def put_station(train_id: int, station_id: int, station: StationPut):
+def put_station(train_id: int, station_id: int, station: StationPut, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -85,8 +100,10 @@ def put_station(train_id: int, station_id: int, station: StationPut):
 
 
 @router.patch("/{station_id}", response_model=StationAdminResponse)
-def patch_station(train_id: int, station_id: int, station: StationPatch):
+def patch_station(train_id: int, station_id: int, station: StationPatch, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -108,8 +125,10 @@ def patch_station(train_id: int, station_id: int, station: StationPatch):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/{station_id}", status_code=status.HTTP_204_NO_CONTENT)
-def hard_delete_station(train_id: int, station_id: int):
+def hard_delete_station(train_id: int, station_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -127,8 +146,10 @@ def hard_delete_station(train_id: int, station_id: int):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/{station_id}/delete", status_code=status.HTTP_200_OK)
-def soft_delete_station(train_id: int, station_id: int):
+def soft_delete_station(train_id: int, station_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -137,7 +158,7 @@ def soft_delete_station(train_id: int, station_id: int):
 
         stations_update_one(train_id, station_id, {"is_deleted": True})
 
-        return {"Detail": f"Station with id {station_id} softly deleted"}
+        return {"detail": f"Station with id {station_id} softly deleted"}
     
     except HTTPException:
         raise 

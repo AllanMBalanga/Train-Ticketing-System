@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Literal
+from typing import Literal, Optional
 from .database import db
 from pymongo import ReturnDocument
 from datetime import datetime
@@ -52,3 +52,15 @@ class Travel(BaseModel):
 #users/{user_id}/payments
 class Payment(BaseModel):
     travel_id: int
+
+
+#Token
+class LoggedInToken(BaseModel):
+    user_id: int
+    access_token: str
+    token_type: str
+    role: str
+
+class TokenData(BaseModel):
+    id: Optional[int] = None
+    role: Optional[Literal["user", "admin"]] = None

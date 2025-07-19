@@ -1,11 +1,12 @@
-from fastapi import APIRouter, status, HTTPException
-from ..body import Travel, get_next_sequence
+from fastapi import APIRouter, Depends, status, HTTPException
+from ..body import Travel, get_next_sequence, TokenData
 from ..updates import TravelPut, TravelPatch
 from ..response import TravelAdminResponse, TravelResponse
 from ..queries import travels_find_one, travels, stations, trains_find_one, stations_find_one, travels_delete_one, travels_update_one, travels_find
-from ..status_codes import validate_travel_exists, validate_station_exists, validate_train_exists
-from typing import List
+from ..status_codes import validate_logged_in_user, validate_required_roles, validate_travel_exists, validate_station_exists, validate_train_exists
+from typing import List, Union
 from datetime import datetime
+from ..oauth2 import get_current_user
 
 router = APIRouter(
     prefix="/trains/{train_id}/travels",
@@ -17,18 +18,25 @@ PER_STATION_RATE = 1.3
 
 travels.create_index("travel_id", unique=True)
 
-@router.get("/", response_model=List[TravelResponse])
-def get_travels(train_id: int):
+@router.get("/", response_model=List[Union[TravelResponse, TravelAdminResponse]])
+def get_travels(train_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
     
     travel = travels_find(train_id)
 
-    return travel
-
-@router.post("/", response_model=TravelResponse)
-def create_travels(train_id: int, travel: Travel):
+    if current_user.role == "user":
+        return [TravelResponse(**i) for i in travel]
+    else:
+        return [TravelAdminResponse(**i) for i in travel]
+    
+@router.post("/", response_model=TravelResponse, status_code=status.HTTP_201_CREATED)
+def create_travels(train_id: int, travel: Travel, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["user"])
+        
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -64,19 +72,26 @@ def create_travels(train_id: int, travel: Travel):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
-@router.get("/{travel_id}", response_model=TravelResponse)
-def get_travel(train_id: int, travel_id: int):
+@router.get("/{travel_id}", response_model=Union[TravelResponse, TravelAdminResponse])
+def get_travel(train_id: int, travel_id: int, current_user: TokenData = Depends(get_current_user)):
+    validate_required_roles(current_user.role, ["user", "admin"])
+
     existing_train = trains_find_one(train_id)
     validate_train_exists(existing_train, train_id)
 
     existing_travel = travels_find_one(train_id, travel_id)
     validate_travel_exists(existing_travel, travel_id)
 
-    return existing_travel
+    if current_user.role == "user":
+        return TravelResponse(**existing_travel)
+    else:
+        return TravelAdminResponse(**existing_travel)
 
-@router.put("/{travel_id}", response_model=TravelResponse)
-def put_travel(train_id: int, travel_id: int, travel: TravelPut):
+@router.put("/{travel_id}", response_model=TravelAdminResponse)
+def put_travel(train_id: int, travel_id: int, travel: TravelPut, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -108,9 +123,11 @@ def put_travel(train_id: int, travel_id: int, travel: TravelPut):
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
-@router.patch("/{travel_id}", response_model=TravelResponse)
-def patch_travel(train_id: int, travel_id: int, travel: TravelPatch):
+@router.patch("/{travel_id}", response_model=TravelAdminResponse)
+def patch_travel(train_id: int, travel_id: int, travel: TravelPatch, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -152,8 +169,10 @@ def patch_travel(train_id: int, travel_id: int, travel: TravelPatch):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/{travel_id}", status_code=status.HTTP_204_NO_CONTENT)
-def hard_delete_travel(train_id: int, travel_id: int):
+def hard_delete_travel(train_id: int, travel_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -171,8 +190,10 @@ def hard_delete_travel(train_id: int, travel_id: int):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error")
 
 @router.delete("/{travel_id}/delete", status_code=status.HTTP_200_OK)
-def soft_delete_travel(train_id: int, travel_id: int):
+def soft_delete_travel(train_id: int, travel_id: int, current_user: TokenData = Depends(get_current_user)):
     try:
+        validate_required_roles(current_user.role, ["user", "admin"])
+
         existing_train = trains_find_one(train_id)
         validate_train_exists(existing_train, train_id)
 
@@ -181,7 +202,7 @@ def soft_delete_travel(train_id: int, travel_id: int):
 
         travels_update_one(train_id, travel_id, {"is_deleted": True})
 
-        return {"Detail": f"Travel with id {travel_id} softly deleted"}
+        return {"detail": f"Travel with id {travel_id} softly deleted"}
 
     except HTTPException:
         raise
