@@ -203,13 +203,20 @@ app/
 
 ---
 
+## 🌍 How to Run
+
+```bash
+python -m venv venv
+source venv/bin/activate.bat  # or venv\Scripts\activate.bat on Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+---
+
 ## 🧠 Summary
 
 This project is a robust, backend system designed to manage train ticketing workflows in a realistic Philippine setting. It handles multiple complex models with strict role separation, fare calculation, and financial logic using MongoDB.
 
 📬 Feel free to fork, test, or extend it! Contributions are welcome.
 
-Install requirements using:
-
-```bash
-pip install -r requirements.txt
