@@ -15,7 +15,6 @@ A backend train ticketing system built using **MongoDB**, **FastAPI**, and **Pyt
 - ✅ **Pydantic-based request/response validation**
 - 🔄 **Postman-ready** with token-based authorization
 - 🧩 **ERD provided** to visualize NoSQL relationships
-- 🧠 **2000+ lines of code** with clean OOP structure
 
 ---
 
