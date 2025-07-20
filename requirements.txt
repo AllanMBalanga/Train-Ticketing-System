@@ -1,0 +1,4 @@
+fastapi[all]
+pymongo
+passlib[bcrypt]
+python-jose[cryptography]
